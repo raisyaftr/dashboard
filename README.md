@@ -25,5 +25,5 @@ Deskripsi singkat tentang proyek kamu di sini. Misalnya: "Dashboard ini dibuat u
    ```
 
 ## Author
-* Nama Kamu - [@raisyaftr](https://github.com)
+* [@raisyaftr](https://github.com)
 *
