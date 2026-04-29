@@ -1,98 +1,97 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
 
 # =========================
 # CONFIG
 # =========================
-st.set_page_config(page_title="Dashboard Data", layout="wide")
+st.set_page_config(page_title="Dashboard Bike Sharing", layout="wide")
 
-st.title("📊 Dashboard Analisis Data Interaktif")
+st.title("🚲 Dashboard Analisis Penyewaan Sepeda")
 
 # =========================
 # LOAD DATA
 # =========================
 @st.cache_data
 def load_data():
-    return pd.read_csv("main_data.csv")
+    return pd.read_csv("main.csv")
 
 df = load_data()
 
 # =========================
-# SIDEBAR
+# SIDEBAR (INTERAKTIF)
 # =========================
-st.sidebar.header("⚙️ Pengaturan")
+st.sidebar.header("⚙️ Filter Data")
 
-# Pilih kolom numerik
-numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
+selected_year = st.sidebar.selectbox(
+    "Pilih Tahun",
+    options=[0, 1],
+    format_func=lambda x: "2011" if x == 0 else "2012"
+)
 
-# Filter data
-selected_column = st.sidebar.selectbox("Pilih Kolom untuk Filter", df.columns)
-
-if df[selected_column].dtype == 'object':
-    selected_value = st.sidebar.selectbox("Pilih Nilai", df[selected_column].unique())
-    filtered_df = df[df[selected_column] == selected_value]
-else:
-    min_val = float(df[selected_column].min())
-    max_val = float(df[selected_column].max())
-    range_val = st.sidebar.slider("Range", min_val, max_val, (min_val, max_val))
-    filtered_df = df[(df[selected_column] >= range_val[0]) & (df[selected_column] <= range_val[1])]
+filtered_df = df[df['yr'] == selected_year]
 
 # =========================
-# MAIN CONTENT
+# METRICS
 # =========================
+col1, col2 = st.columns(2)
+col1.metric("Total Data", len(filtered_df))
+col2.metric("Total Penyewaan", int(filtered_df['cnt'].sum()))
 
-tab1, tab2, tab3 = st.tabs(["📄 Data", "📊 Visualisasi", "📈 Statistik"])
-
-# =========================
-# TAB 1 - DATA
-# =========================
-with tab1:
-    st.subheader("Preview Data")
-    st.dataframe(filtered_df)
+st.markdown("---")
 
 # =========================
-# TAB 2 - VISUALISASI
+# PERTANYAAN 1
 # =========================
-with tab2:
-    st.subheader("Visualisasi Data")
+st.subheader("🌡️ Pengaruh Suhu terhadap Penyewaan (2011)")
 
-    col1, col2 = st.columns(2)
+# Filter khusus 2011
 
-    with col1:
-        st.write("Histogram")
-        hist_col = st.selectbox("Pilih Kolom Histogram", numeric_cols)
-        fig, ax = plt.subplots()
-        sns.histplot(filtered_df[hist_col], kde=True, ax=ax)
-        st.pyplot(fig)
+df_2011 = df[df['yr'] == 0]
 
-    with col2:
-        st.write("Bar Chart")
-        cat_cols = df.select_dtypes(include=['object']).columns.tolist()
-        if cat_cols:
-            bar_col = st.selectbox("Pilih Kolom Kategori", cat_cols)
-            fig, ax = plt.subplots()
-            filtered_df[bar_col].value_counts().plot(kind='bar', ax=ax)
-            st.pyplot(fig)
+agg_q1 = df_2011.groupby('mnth').agg({
+    'temp': 'mean',
+    'cnt': 'sum'
+}).reset_index()
 
-    st.write("Correlation Heatmap")
-    fig, ax = plt.subplots()
-    sns.heatmap(filtered_df[numeric_cols].corr(), annot=True, cmap='coolwarm', ax=ax)
-    st.pyplot(fig)
+fig, ax1 = plt.subplots()
+
+ax1.plot(agg_q1['mnth'], agg_q1['cnt'], marker='o')
+ax1.set_ylabel('Total Penyewaan')
+ax1.set_xlabel('Bulan')
+
+ax2 = ax1.twinx()
+ax2.plot(agg_q1['mnth'], agg_q1['temp'], linestyle='--')
+ax2.set_ylabel('Rata-rata Suhu')
+
+st.pyplot(fig)
+
+st.info("Kenaikan suhu di pertengahan tahun diikuti peningkatan jumlah penyewaan sepeda.")
 
 # =========================
-# TAB 3 - STATISTIK
+# PERTANYAAN 2
 # =========================
-with tab3:
-    st.subheader("Statistik Deskriptif")
-    st.write(filtered_df.describe())
+st.subheader("📈 Perbandingan Penyewaan 2011 vs 2012")
 
-    st.subheader("Missing Values")
-    st.write(filtered_df.isnull().sum())
+agg_q2 = df.groupby('yr')['cnt'].sum().reset_index()
+agg_q2['yr'] = agg_q2['yr'].map({0: '2011', 1: '2012'})
+
+fig2, ax = plt.subplots()
+ax.bar(agg_q2['yr'], agg_q2['cnt'])
+ax.set_ylabel("Total Penyewaan")
+
+st.pyplot(fig2)
+
+st.info("Terjadi peningkatan signifikan jumlah penyewaan dari 2011 ke 2012.")
+
+# =========================
+# DATA PREVIEW
+# =========================
+st.subheader("📄 Data Preview")
+st.dataframe(filtered_df, use_container_width=True)
 
 # =========================
 # FOOTER
 # =========================
 st.markdown("---")
-st.caption("Dibuat dengan Streamlit 🚀")
+st.caption("Dashboard sesuai pertanyaan bisnis ✔️")
