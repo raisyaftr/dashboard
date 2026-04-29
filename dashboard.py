@@ -1,97 +1,143 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 
-# =========================
-# CONFIG
-# =========================
-st.set_page_config(page_title="Dashboard Bike Sharing", layout="wide")
-
-st.title("🚲 Dashboard Analisis Penyewaan Sepeda")
-
-# =========================
+# ========================
 # LOAD DATA
-# =========================
+# ========================
 @st.cache_data
 def load_data():
-    return pd.read_csv("main.csv")
+    df = pd.read_csv('main_data.csv')
+    df['dteday'] = pd.to_datetime(df['dteday'])
+    df['year'] = df['dteday'].dt.year
+    df['month'] = df['dteday'].dt.month
+    return df
 
 df = load_data()
 
-# =========================
-# SIDEBAR (INTERAKTIF)
-# =========================
-st.sidebar.header("⚙️ Filter Data")
+# ========================
+# TITLE
+# ========================
+st.title("🚲 Dashboard Analisis Penyewaan Sepeda")
+st.write("""
+Dashboard ini dibuat untuk menjawab:
+1. Pengaruh suhu terhadap penyewaan sepeda tahun 2011
+2. Perbandingan penyewaan tahun 2011 vs 2012
+""")
 
-selected_year = st.sidebar.selectbox(
+# ========================
+# FILTER INTERAKTIF
+# ========================
+st.sidebar.header("🔍 Filter Data")
+
+selected_year = st.sidebar.multiselect(
     "Pilih Tahun",
-    options=[0, 1],
-    format_func=lambda x: "2011" if x == 0 else "2012"
+    options=df['year'].unique(),
+    default=df['year'].unique()
 )
 
-filtered_df = df[df['yr'] == selected_year]
+selected_month = st.sidebar.slider(
+    "Pilih Rentang Bulan",
+    1, 12, (1, 12)
+)
 
-# =========================
-# METRICS
-# =========================
-col1, col2 = st.columns(2)
-col1.metric("Total Data", len(filtered_df))
-col2.metric("Total Penyewaan", int(filtered_df['cnt'].sum()))
+filtered_df = df[
+    (df['year'].isin(selected_year)) &
+    (df['month'] >= selected_month[0]) &
+    (df['month'] <= selected_month[1])
+]
 
-st.markdown("---")
+# ========================
+# VISUALISASI 1
+# ========================
+st.subheader("📈 Pengaruh Suhu terhadap Penyewaan (2011)")
 
-# =========================
-# PERTANYAAN 1
-# =========================
-st.subheader("🌡️ Pengaruh Suhu terhadap Penyewaan (2011)")
+df_2011 = df[df['year'] == 2011]
 
-# Filter khusus 2011
-
-df_2011 = df[df['yr'] == 0]
-
-agg_q1 = df_2011.groupby('mnth').agg({
+monthly_temp_rent = df_2011.groupby('month').agg({
     'temp': 'mean',
     'cnt': 'sum'
 }).reset_index()
 
-fig, ax1 = plt.subplots()
+fig1, ax1 = plt.subplots()
 
-ax1.plot(agg_q1['mnth'], agg_q1['cnt'], marker='o')
-ax1.set_ylabel('Total Penyewaan')
-ax1.set_xlabel('Bulan')
+sns.lineplot(
+    data=monthly_temp_rent,
+    x='month',
+    y='cnt',
+    marker='o',
+    label='Total Penyewaan',
+    ax=ax1
+)
 
-ax2 = ax1.twinx()
-ax2.plot(agg_q1['mnth'], agg_q1['temp'], linestyle='--')
-ax2.set_ylabel('Rata-rata Suhu')
+sns.lineplot(
+    data=monthly_temp_rent,
+    x='month',
+    y='temp',
+    marker='o',
+    label='Suhu',
+    ax=ax1
+)
 
-st.pyplot(fig)
+ax1.set_title("Suhu vs Penyewaan Sepeda (2011)")
+ax1.set_xlabel("Bulan")
+ax1.set_ylabel("Nilai")
 
-st.info("Kenaikan suhu di pertengahan tahun diikuti peningkatan jumlah penyewaan sepeda.")
+st.pyplot(fig1)
 
-# =========================
-# PERTANYAAN 2
-# =========================
-st.subheader("📈 Perbandingan Penyewaan 2011 vs 2012")
+st.write("""
+Insight:
+- Saat suhu meningkat (pertengahan tahun), jumlah penyewaan juga meningkat
+- Hubungan positif terlihat jelas
+""")
 
-agg_q2 = df.groupby('yr')['cnt'].sum().reset_index()
-agg_q2['yr'] = agg_q2['yr'].map({0: '2011', 1: '2012'})
+# ========================
+# VISUALISASI 2
+# ========================
+st.subheader("📊 Perbandingan Penyewaan 2011 vs 2012")
 
-fig2, ax = plt.subplots()
-ax.bar(agg_q2['yr'], agg_q2['cnt'])
-ax.set_ylabel("Total Penyewaan")
+yearly_rent = df.groupby('year')['cnt'].sum().reset_index()
+
+fig2, ax2 = plt.subplots()
+
+sns.barplot(
+    data=yearly_rent,
+    x='year',
+    y='cnt',
+    ax=ax2
+)
+
+ax2.set_title("Total Penyewaan per Tahun")
 
 st.pyplot(fig2)
 
-st.info("Terjadi peningkatan signifikan jumlah penyewaan dari 2011 ke 2012.")
+st.write("""
+Insight:
+- Tahun 2012 memiliki total penyewaan lebih tinggi dibanding 2011
+- Menunjukkan adanya pertumbuhan bisnis
+""")
 
-# =========================
-# DATA PREVIEW
-# =========================
-st.subheader("📄 Data Preview")
-st.dataframe(filtered_df, use_container_width=True)
+# ========================
+# FITUR INTERAKTIF
+# ========================
+st.subheader("🔎 Eksplorasi Data Interaktif")
 
-# =========================
-# FOOTER
-# =========================
-st.markdown("---")
-st.caption("Dashboard sesuai pertanyaan bisnis ✔️")
+st.write("Data berdasarkan filter yang dipilih:")
+
+st.dataframe(filtered_df)
+
+# Tambahan visual interaktif
+st.write("Distribusi Penyewaan Berdasarkan Bulan")
+
+fig3, ax3 = plt.subplots()
+
+sns.lineplot(
+    data=filtered_df.groupby('month')['cnt'].sum().reset_index(),
+    x='month',
+    y='cnt',
+    marker='o',
+    ax=ax3
+)
+
+st.pyplot(fig3)
